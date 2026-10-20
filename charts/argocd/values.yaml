@@ -1,0 +1,15 @@
+# Values for self-managed Argo CD — used by BOTH bootstrap/install.sh (first install)
+# and apps/argocd/application.yaml (day-2). Edit here and push; Argo CD applies it.
+#
+# All values are nested under the `argo-cd:` subchart key (see Chart.yaml dependency).
+argo-cd:
+  configs:
+    params:
+      # Serve the UI over plain HTTP so port-forwarding works without TLS warnings.
+      server.insecure: true
+
+  # Not needed locally — saves CPU/memory on minikube.
+  dex:
+    enabled: false
+  notifications:
+    enabled: false

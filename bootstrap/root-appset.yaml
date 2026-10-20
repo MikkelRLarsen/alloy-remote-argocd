@@ -1,0 +1,36 @@
+# Root ApplicationSet — the only object applied by hand (via bootstrap/install.sh).
+#
+# Scans apps/* and creates one wrapper Application per folder, which deploys
+# whatever manifests that folder contains (normally apps/<svc>/application.yaml).
+# Add a new app by creating apps/<svc>/ + charts/<svc>/ and pushing to main.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: app-catalog
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+        revision: main
+        directories:
+          - path: apps/*
+  template:
+    metadata:
+      name: '{{.path.basename}}-app'
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+        targetRevision: main
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

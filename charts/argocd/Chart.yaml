@@ -1,0 +1,13 @@
+apiVersion: v2
+name: argocd
+description: >-
+  Self-managed Argo CD. Umbrella chart wrapping the upstream argo-cd chart.
+  Installed once by bootstrap/install.sh, then adopted and managed by
+  apps/argocd/application.yaml — both render this exact chart, so they never drift.
+type: application
+version: 0.1.0
+
+dependencies:
+  - name: argo-cd
+    version: 8.0.1
+    repository: https://argoproj.github.io/argo-helm

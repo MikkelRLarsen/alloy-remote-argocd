@@ -1,0 +1,47 @@
+# Self-managed Argo CD.
+#
+# bootstrap/install.sh installs charts/argocd with Helm (release "argocd"); this
+# Application renders the same chart with the same release name, so it ADOPTS
+# that install instead of deploying a second Argo CD. From then on, changes to
+# charts/argocd are rolled out by Argo CD itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    # Diff via server-side apply dry-run, so CRD defaults stamped on live objects
+    # don't show up as a permanent OutOfSync.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
+  # NO resources-finalizer: deleting this Application must never cascade-delete
+  # Argo CD itself.
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+    targetRevision: main
+    path: charts/argocd
+    helm:
+      # Must match the release name used by bootstrap/install.sh. Argo CD would
+      # otherwise default it to the Application name.
+      releaseName: argocd
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    # Auto-apply changes and revert manual edits, but NEVER prune — a bad commit
+    # must not be able to delete parts of Argo CD.
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      # Argo CD's CRDs are too large for client-side apply.
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
