@@ -1,8 +1,9 @@
 apiVersion: v2
-name: grafana-stack
-description: Grafana with a persistent PostgreSQL backing database for local minikube.
+name: grafana
+description: Grafana with a PostgreSQL backing database for local minikube.
 type: application
 version: 0.1.0
+
 dependencies:
   - name: grafana
     version: 10.5.15

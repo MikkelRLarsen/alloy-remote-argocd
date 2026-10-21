@@ -1,0 +1,10 @@
+apiVersion: v2
+name: prometheus
+description: Prometheus (server + Alertmanager) as a remote-write receiver for local minikube.
+type: application
+version: 0.1.0
+
+dependencies:
+  - name: prometheus
+    version: 29.23.1
+    repository: https://prometheus-community.github.io/helm-charts

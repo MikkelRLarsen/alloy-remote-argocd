@@ -1,0 +1,61 @@
+prometheus:
+  server:
+    retention: "3d"
+    retentionSize: "1800MB"
+    # extraArgs with a null value is dropped when passed to a subchart.
+    extraFlags:
+      - web.enable-lifecycle
+      - web.enable-remote-write-receiver
+    persistentVolume:
+      enabled: true
+      size: 2Gi
+    ingress:
+      enabled: false
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+
+  alertmanager:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 512Mi
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+        prometheus.io/path: "/metrics"
+
+  kube-state-metrics:
+    enabled: false
+
+  prometheus-node-exporter:
+    enabled: false
+
+  prometheus-pushgateway:
+    enabled: false
+
+  # Receiver only, like Dao non-prod.
+  scrapeConfigs:
+    prometheus:
+      enabled: false
+    kubernetes-api-servers:
+      enabled: false
+    kubernetes-nodes:
+      enabled: false
+    kubernetes-nodes-cadvisor:
+      enabled: false
+    kubernetes-service-endpoints:
+      enabled: false
+    kubernetes-service-endpoints-slow:
+      enabled: false
+    prometheus-pushgateway:
+      enabled: false
+    kubernetes-services:
+      enabled: false
+    kubernetes-pods:
+      enabled: false
+    kubernetes-pods-slow:
+      enabled: false
