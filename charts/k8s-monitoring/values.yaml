@@ -1,0 +1,529 @@
+# yamllint disable rule:line-length rule:comments-indentation
+---
+k8s-monitoring:
+  cluster:
+    name: mgmt-non-prod
+
+  destinations:
+    prometheus-app-metrics:
+      type: prometheus
+      url: "http://prometheus-server.prometheus/api/v1/write"
+
+    loki-logs:
+      type: loki
+      url: "http://loki.loki:3100/loki/api/v1/push"
+
+  #
+  # CLUSTER METRICS
+  #
+  clusterMetrics:
+    enabled: true
+    collector: alloy-metrics
+
+    # Upstream allow-lists are tuned for Grafana Cloud's bundled dashboards and drop
+    # metrics we query, so they are disabled everywhere. See README.md.
+    kubelet:
+      metricsTuning:
+        useDefaultAllowList: false
+    kubeletResource:
+      metricsTuning:
+        useDefaultAllowList: false
+    cadvisor:
+      metricsTuning:
+        useDefaultAllowList: false
+        # Named high-cardinality/low-value drops instead of the allow-list. Taking from alloy-setup
+        excludeMetrics:
+          - container_network_tcp_usage_total
+          - container_network_udp_usage_total
+          - container_tasks_state
+          - container_memory_failures_total
+          - container_blkio_device_usage_total
+    kube-state-metrics:
+      metricsTuning:
+        useDefaultAllowList: false
+
+  #
+  # HOST METRICS
+  #
+  hostMetrics:
+    enabled: true
+    collector: alloy-metrics
+    linuxHosts:
+      enabled: true
+      metricsTuning:
+        useDefaultAllowList: false
+
+
+  annotationAutodiscovery:
+    enabled: true
+    collector: alloy-metrics
+    services:
+      enabled: false # Disable the build-in service discovery and replace it with custom endpoint discovery (same annotations)
+
+    # Changed annotation from k8s.grafana.com to default prometheus annotations
+    annotations:
+      scrape: "prometheus.io/scrape" # opt in set this to true
+      job: "prometheus.io/job"
+      instance: "prometheus.io/instance"
+      metricsContainer: "prometheus.io/container"
+      metricsPath: "prometheus.io/path"
+      metricsPortName: "prometheus.io/portName"
+      metricsPortNumber: "prometheus.io/port"
+      metricsScheme: "prometheus.io/scheme"
+      metricsParam: "prometheus.io/param"
+      metricsScrapeInterval: "prometheus.io/scrapeInterval"
+      metricsScrapeTimeout: "prometheus.io/scrapeTimeout"
+    extraDiscoveryRules: |
+      rule {
+        source_labels = ["__meta_kubernetes_service_label_environment"]
+        target_label  = "environment"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_node_name"]
+        target_label  = "node"
+      }
+  
+
+  # Extra Custom Configs
+  externalTargets:
+    scrapeInterval: 60s
+    enabled: false
+    labels:
+      cluster: infra-shared
+
+  #
+  # LOGS
+  #
+  podLogsViaLoki:
+    enabled: true
+    collector: alloy-logs
+
+    extraDiscoveryRules: |
+      rule {
+        source_labels = ["__meta_kubernetes_pod_node_name"]
+        target_label  = "node"
+      }
+
+    # Look at logParsing how to use these processes
+    extraLogProcessingStages: |
+      {{- with .Values.logDropping }}
+      {{- if .enabled }}
+      {{- range $name, $item := .items }}
+      {{- if $item.enabled }}
+      {{- if not $item.selector }}
+      {{- fail (printf "logDropping.items.%s is enabled but has no selector" $name) }}
+      {{- end }}
+      {{- if not $item.drop }}
+      {{- fail (printf "logDropping.items.%s is enabled but has no drop value" $name) }}
+      {{- end }}
+      {{- if not $item.operator }}
+      {{- fail (printf "logDropping.items.%s is enabled but has no operator value" $name) }}
+      {{- end }}
+
+      stage.match {
+        selector = {{ printf `%s %s "%s"` $item.selector $item.operator $item.drop | quote }}
+        action = "drop"
+        drop_counter_reason = {{ $item.reason | default $name | quote }}
+      }
+
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+
+      {{- with .Values.logParsing }}
+      {{- if .enabled }}
+      {{- range $name, $item := .items }}
+      {{- if $item.enabled }}
+      {{- $selector := $item.selector }}
+      {{- with $item.containers }}
+      {{- if eq (len .) 1 }}
+      {{- $selector = printf "{container=\"%s\"}" (first .) }}
+      {{- else }}
+      {{- $selector = printf "{container=~\"%s\"}" (join "|" .) }}
+      {{- end }}
+      {{- end }}
+      {{- $regex := $item.regex | default dict }}
+      {{- $json := $item.json | default dict }}
+      {{- $label := $item.label | default dict }}
+      {{- $multiline := $item.multiline | default dict }}
+      {{- /*
+        A selector is required for multiline, json, and regex processing.
+      */}}
+      {{- $needsSelector := or $multiline.enabled $json.enabled $regex.enabled }}
+      {{- if and $needsSelector (not $selector) }}
+      {{- fail (printf "logParsing.items.%s is enabled but has neither `containers` nor `selector` — an empty selector matches nothing and fails silently" $name) }}
+      {{- end }}
+
+      {{- if $multiline.enabled }}
+      stage.match {
+        selector = {{ $selector | quote }}
+        stage.multiline {
+          firstline     = {{ $multiline.firstline | quote }}
+          max_wait_time = {{ $multiline.maxWaitTime | quote }}
+          {{- if $multiline.maxLines }}
+          max_lines     = {{ $multiline.maxLines }}
+          {{- end }}
+        }
+      }
+      {{- end }}
+      
+      {{- if $label.enabled }}
+      stage.match {
+        selector = {{ $selector | quote }}
+        stage.static_labels {
+          values = {
+            {{- range $k, $v := $label.items }}
+            {{ $k }} = {{ $v }},
+            {{- end }}
+          }
+        }
+      }
+      {{- end }}
+
+      {{- if $json.enabled }}
+      stage.match {
+        selector = {{ $selector | quote }}
+        stage.json {
+          expressions = {
+            {{- range $k, $v := $json.expressions }}
+            {{ $k }} = {{ $v }},
+            {{- end }}
+          }
+        }
+      }
+      {{- end }}
+
+      {{- if $regex.enabled }}
+      {{- range ($regex.expressions | default list) }}
+      stage.match {
+        selector = {{ $selector | quote }}
+        stage.regex {
+          expression = {{ .pattern | quote }}
+        }
+      }
+      {{- end }}
+      {{- end }}
+      
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+
+      {{- with .Values.levelNormalization }}
+      {{- if .enabled }}
+      stage.template {
+        source   = "level"
+        template = {{ `"{{ ToLower .Value }}"` }}
+      }
+      {{- range .rules }}
+      stage.replace {
+        source     = "level"
+        expression = {{ .match | quote }}
+        replace    = {{ .replace | quote }}
+      }
+      {{- end }}
+      {{- end }}
+      {{- end }}
+
+      {{- with .Values.customStructuredMetadata }}
+      {{- if .enabled }}
+      {{- $active := dict }}
+      {{- range $k, $v := .values }}
+      {{- if $v.enabled }}
+      {{- $_ := set $active $k $v.value }}
+      {{- end }}
+      {{- end }}
+      {{- if $active }}
+      stage.structured_metadata {
+        values = {
+          {{- range $k, $v := $active }}
+          {{ $k }} = {{ $v | quote }},
+          {{- end }}
+        }
+      }
+      {{- end }}
+      {{- end }}
+      {{- end }}
+
+    logDropping:
+      enabled: true
+      items:
+        kubeProbe:
+          enabled: true
+          selector: '{namespace=~".+"}'
+          drop: "kube-probe"
+          operator: '|='
+          reason: "kube_probe"
+
+    # Custom Log Parsing
+    logParsing:
+      enabled: true
+      items:
+        reflector:
+          containers:
+            - reflector
+          enabled: true
+          regex:
+            enabled: true
+            expressions:
+              - pattern: '\[(?P<level>VRB|DBG|INF|WRN|ERR|FTL)\]'
+
+        alloy:
+          containers:
+            - alloy
+          enabled: true
+          regex:
+            enabled: true
+            expressions:
+              - pattern: '\blevel=(?P<level>[a-z]+)\b'
+
+        k8sControlPlane:
+          containers:
+            - cluster-register
+            - cilium-agent
+            - cilium-operator
+            - kube-apiserver
+            - kube-controller-manager
+          enabled: true
+          regex:
+            enabled: true
+            expressions:
+              - pattern: '^(?P<level>[IWEF])\d{4}\s'
+
+    levelNormalization:
+      enabled: true
+      rules:
+        - match: '^(i|inf|information|log|notice)$'
+          replace: info
+        - match: '^(w|wrn|warning)$'
+          replace: warn
+        - match: '^(e|err|crit|critical)$'
+          replace: error
+        - match: '^(f|ftl|panic)$'
+          replace: fatal
+        - match: '^(d|dbg|debug[1-5])$'
+          replace: debug
+        - match: '^(v|vrb)$'
+          replace: trace
+
+    customStructuredMetadata:
+      enabled: true
+      values:
+        level:
+          value: level
+          enabled: true
+
+  clusterEvents:
+    enabled: true
+    collector: alloy-events
+  telemetryServices:
+    node-exporter:
+      deploy: true
+    kube-state-metrics:
+      deploy: true
+  #
+  # COLLECTORS
+  #
+  collectors:
+    alloy-metrics:
+      enable: true
+      presets: [clustered, statefulset]
+      alloy:
+        storagePath: /var/lib/alloy
+        mounts:
+          extra:
+            - name: alloy-wal
+              mountPath: /var/lib/alloy
+      controller:
+        replicas: 1
+        enableStatefulSetAutoDeletePVC: true
+        volumeClaimTemplates:
+          - metadata:
+              name: alloy-wal
+            spec:
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 1Gi
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/job: "alloy-metrics"
+          prometheus.io/port: "12345"
+          prometheus.io/container: "alloy"
+          k8s.grafana.com/logs.job: integrations/alloy
+      # Custom config for external scrape jobs. See externalTargets
+      # Custom endpoint annotation discovery rather than the default service which has been disabled in annotationDiscovery.services.enabled
+      extraConfig: |
+        // externalTagets
+        {{- $m := . }}
+        {{- with $m.Values.externalTargets }}
+        {{- if .enabled }}
+        {{- $base := dict "cluster" $m.Values.cluster.name }}
+        {{- $groupLabels := .labels | default dict }}
+        {{- $groupResolved := mergeOverwrite (dict) $base $groupLabels }}
+        {{- range $key, $item := .items }}
+        {{- if $item.enabled }}
+        {{- $itemLabels := $item.labels | default dict }}
+        {{- $labels := mergeOverwrite (dict) $groupResolved $itemLabels }}
+        prometheus.scrape {{ .name | replace "-" "_" | quote }} {
+          targets = [
+            {{- range .targets }}
+            {"__address__" = {{ . | quote }}{{ range $k, $v := $labels }}{{ if $v }}, {{ $k | quote }} = {{ $v | quote }}{{ end }}{{ end }}},
+            {{- end }}
+          ]
+          forward_to      = [prometheus.remote_write.prometheus_app_metrics.receiver]
+          job_name        = {{ .name | quote }}
+          scrape_interval = {{ $m.Values.externalTargets.scrapeInterval | quote }}
+        }
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        
+        // service scrape replacement for annotationDiscovery.services
+        discovery.kubernetes "annotated_endpoints" {
+          role = "endpointslice"
+        }
+
+        discovery.relabel "annotated_endpoints" {
+          targets = discovery.kubernetes.annotated_endpoints.targets
+
+          // opt in via the Service annotation
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_scrape"]
+            regex  = "true"
+            action = "keep"
+          }
+          // avoid double-scraping pods that already opted in on their own
+          rule {
+            source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
+            regex  = "true"
+            action = "drop"
+          }
+          // ready backends only
+          rule {
+            source_labels = ["__meta_kubernetes_endpointslice_endpoint_conditions_ready"]
+            regex  = "true"
+            action = "keep"
+          }
+
+          // port selection: honour prometheus.io/portName if set
+          rule {
+            source_labels = ["__meta_kubernetes_endpointslice_port_name"]
+            target_label  = "__tmp_port"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_portName"]
+            regex         = "(.+)"
+            target_label  = "__tmp_port"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_endpointslice_port_name"]
+            action        = "keepequal"
+            target_label  = "__tmp_port"
+          }
+          rule {
+            action = "labeldrop"
+            regex  = "__tmp_port"
+          }
+          // explicit port number wins, IPv4 then IPv6
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_port", "__meta_kubernetes_pod_ip"]
+            regex         = "(\\d+);((([0-9]+?)(\\.|$)){4})"
+            replacement   = "$2:$1"
+            target_label  = "__address__"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_path"]
+            regex         = "(.+)"
+            target_label  = "__metrics_path__"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_scheme"]
+            regex         = "(.+)"
+            target_label  = "__scheme__"
+          }
+          rule {
+            action      = "labelmap"
+            regex       = "__meta_kubernetes_service_annotation_prometheus_io_param_(.+)"
+            replacement = "__param_$1"
+          }
+
+          // identity labels
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_service_name"]
+            target_label  = "service"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_node_name"]
+            target_label  = "node"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_service_label_environment"]
+            target_label  = "environment"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_job"]
+            target_label  = "job"
+          }
+          rule {
+            source_labels = ["job", "__meta_kubernetes_service_label_app_kubernetes_io_name"]
+            regex         = ";(.+)"
+            target_label  = "job"
+          }
+          rule {
+            source_labels = ["job", "service"]
+            regex         = ";(.+)"
+            target_label  = "job"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_instance"]
+            target_label  = "instance"
+          }
+        }
+
+        prometheus.scrape "annotated_endpoints" {
+          targets           = discovery.relabel.annotated_endpoints.output
+          honor_labels      = true
+          scrape_interval   = "60s"
+          scrape_timeout    = "10s"
+          clustering {
+            enabled = true
+          }
+          forward_to = [prometheus.remote_write.prometheus_app_metrics.receiver]
+        }
+    alloy-logs:
+      presets: [filesystem-log-reader, daemonset]
+      controller:
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/job: "alloy-logs"
+          prometheus.io/port: "12345"
+          prometheus.io/container: "alloy"
+          k8s.grafana.com/logs.job: integrations/alloy
+    alloy-events:
+      presets: [singleton]
+      controller:
+        replicas: 1
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/job: "alloy-events"
+          prometheus.io/port: "12345"
+          prometheus.io/container: "alloy"
+          k8s.grafana.com/logs.job: integrations/alloys
+  alloy-operator:
+    deploy: true
