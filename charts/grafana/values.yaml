@@ -1,5 +1,9 @@
-# Create this Secret before syncing; see README.md. Never commit credentials.
+# Local Minikube credentials; the chart creates this Kubernetes Secret.
 credentialsSecret: grafana-credentials
+credentials:
+  adminUser: admin
+  adminPassword: minikube-admin
+  postgresPassword: minikube-postgres
 
 postgresql:
   image: postgres:17.7-bookworm
@@ -25,7 +29,7 @@ grafana:
   grafana.ini:
     database:
       type: postgres
-      host: grafana-postgresql:5432
+      host: '{{ .Release.Name }}-postgresql:5432'
       name: grafana
       user: grafana
       # Traffic stays within the local cluster.
