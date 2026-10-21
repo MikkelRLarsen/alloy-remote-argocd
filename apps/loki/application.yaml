@@ -1,0 +1,45 @@
+# Loki — local observability backend, deployed as a single Application.
+# Discovered through apps/loki by the root app-catalog ApplicationSet.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: application
+    app.kubernetes.io/managed-by: argocd
+    environment: non-prod
+    type: application
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # This repository uses the default project; no platform AppProject is defined.
+  project: default
+  source:
+    repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+    targetRevision: main
+    path: charts/loki
+    helm:
+      # Pin the release name for predictable resource names.
+      releaseName: loki
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: loki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

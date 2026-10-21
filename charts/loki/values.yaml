@@ -1,0 +1,59 @@
+# The outer loki key configures the dependency; the inner loki key configures Loki itself.
+loki:
+  deploymentMode: SingleBinary
+
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+
+    schemaConfig:
+      configs:
+        - from: "2024-04-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+
+    limits_config:
+      retention_period: 48h
+
+    compactor:
+      working_directory: /var/loki/compactor
+      retention_enabled: true
+      delete_request_store: filesystem
+
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "3100"
+      prometheus.io/path: "/metrics"
+      prometheus.io/container: "loki"
+
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: true
+      size: 3Gi
+
+  gateway:
+    enabled: false
+
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+
+  test:
+    enabled: false
+  lokiCanary:
+    enabled: false
+  backend:
+    replicas: 0
+  read:
+    replicas: 0
+  write:
+    replicas: 0

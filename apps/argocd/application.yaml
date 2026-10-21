@@ -9,6 +9,12 @@ kind: Application
 metadata:
   name: argocd
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: application
+    app.kubernetes.io/managed-by: argocd
+    environment: non-prod
+    type: application
   annotations:
     # Diff via server-side apply dry-run, so CRD defaults stamped on live objects
     # don't show up as a permanent OutOfSync.
@@ -37,10 +43,11 @@ spec:
       prune: false
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       # Argo CD's CRDs are too large for client-side apply.
       - ServerSideApply=true
     retry:
-      limit: 3
+      limit: 5
       backoff:
         duration: 5s
         factor: 2

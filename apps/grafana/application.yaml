@@ -3,6 +3,14 @@ kind: Application
 metadata:
   name: grafana
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: application
+    app.kubernetes.io/managed-by: argocd
+    environment: non-prod
+    type: application
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -13,7 +21,8 @@ spec:
     path: charts/grafana
     helm:
       releaseName: grafana
-      valueFiles: [values.yaml]
+      valueFiles:
+        - values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: grafana
@@ -24,3 +33,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

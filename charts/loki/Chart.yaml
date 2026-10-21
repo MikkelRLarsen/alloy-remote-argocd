@@ -1,0 +1,10 @@
+apiVersion: v2
+name: loki
+description: Single-binary Loki with filesystem storage for local Minikube.
+type: application
+version: 0.1.0
+
+dependencies:
+  - name: loki
+    version: 7.3.0
+    repository: https://grafana.github.io/helm-charts
