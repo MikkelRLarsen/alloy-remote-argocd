@@ -1,0 +1,40 @@
+# Create this Secret before syncing; see README.md. Never commit credentials.
+credentialsSecret: grafana-credentials
+
+postgresql:
+  image: postgres:17.7-bookworm
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+grafana:
+  replicas: 1
+  admin:
+    existingSecret: grafana-credentials
+    userKey: admin-user
+    passwordKey: admin-password
+  envValueFrom:
+    GF_DATABASE_PASSWORD:
+      secretKeyRef:
+        name: grafana-credentials
+        key: postgres-password
+  grafana.ini:
+    database:
+      type: postgres
+      host: grafana-postgresql:5432
+      name: grafana
+      user: grafana
+      # Traffic stays within the local cluster.
+      ssl_mode: disable
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
