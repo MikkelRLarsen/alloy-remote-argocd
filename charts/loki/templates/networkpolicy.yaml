@@ -1,0 +1,44 @@
+# Loki does not authenticate requests itself. Allow the gateway, Loki peers,
+# and the metrics collector. Requires a NetworkPolicy-capable CNI.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: loki-backend
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: single-binary
+  policyTypes:
+    - Ingress
+  ingress:
+    # NetworkPolicy filters ports, not HTTP paths; this collector can access
+    # all Loki HTTP endpoints on 3100, including the unauthenticated /metrics.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: k8s-monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alloy-metrics
+              app.kubernetes.io/instance: k8s-monitoring-alloy-metrics
+      ports:
+        - protocol: TCP
+          port: 3100
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: gateway
+      ports:
+        - protocol: TCP
+          port: 3100
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: single-binary

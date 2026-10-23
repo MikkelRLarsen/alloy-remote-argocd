@@ -1,5 +1,29 @@
 prometheus:
+  configmapReload:
+    # Kubernetes expands these Secret-backed environment variables in the args.
+    reloadUrl: "http://$(PROMETHEUS_USERNAME):$(PROMETHEUS_PASSWORD)@127.0.0.1:9090/-/reload"
+    env:
+      - name: PROMETHEUS_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: prometheus-basic-auth
+            key: username
+      - name: PROMETHEUS_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: prometheus-basic-auth
+            key: password
+
   server:
+    extraArgs:
+      web.config.file: /etc/prometheus-auth/web.yml
+    extraSecretMounts:
+      - name: basic-auth
+        secretName: prometheus-basic-auth
+        mountPath: /etc/prometheus-auth
+        readOnly: true
+    # HTTP health endpoints now require credentials, too.
+    tcpSocketProbeEnabled: true
     retention: "3d"
     retentionSize: "1800MB"
     # extraArgs with a null value is dropped when passed to a subchart.
@@ -13,7 +37,8 @@ prometheus:
       enabled: false
     service:
       annotations:
-        prometheus.io/scrape: "true"
+        # Generic annotation scrapes do not supply basic auth.
+        prometheus.io/scrape: "false"
         prometheus.io/port: "9090"
         prometheus.io/path: "/metrics"
 

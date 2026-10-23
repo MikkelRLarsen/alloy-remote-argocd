@@ -26,13 +26,21 @@ grafana:
           uid: prometheus
           type: prometheus
           url: http://prometheus-server.prometheus
+          basicAuth: true
+          basicAuthUser: $PROMETHEUS_USERNAME
+          secureJsonData:
+            basicAuthPassword: $PROMETHEUS_PASSWORD
           access: proxy
           isDefault: true
 
         - name: Loki
           uid: loki
           type: loki
-          url: http://loki.loki:3100
+          url: http://loki-gateway.loki
+          basicAuth: true
+          basicAuthUser: $LOKI_USERNAME
+          secureJsonData:
+            basicAuthPassword: $LOKI_PASSWORD
           access: proxy
 
   resources:
@@ -46,6 +54,10 @@ grafana:
 envSecret:
   secretName: grafana
   values:
+    PROMETHEUS_USERNAME: monitoring
+    PROMETHEUS_PASSWORD: minikube-monitoring
+    LOKI_USERNAME: monitoring
+    LOKI_PASSWORD: minikube-monitoring
     POSTGRES_DB: grafana
     POSTGRES_USER: grafana
     POSTGRES_PASSWORD: minikube-postgres
