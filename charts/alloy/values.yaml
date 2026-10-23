@@ -1,6 +1,4 @@
-# The outer alloy key configures the Helm dependency.
 alloy:
-  # Exposes the Alloy UI on port 12345 for kubectl port-forward.
   service:
     enabled: true
     type: ClusterIP
@@ -9,7 +7,6 @@ alloy:
     type: deployment
     replicas: 1
 
-  # No monitoring CRDs are needed for this bootstrap.
   crds:
     create: false
 
