@@ -24,7 +24,7 @@ alloy:
 
           basic_auth {
             username = "MikkelRLarsen"
-            password = "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"
+            password = "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"
           }
         }
 
