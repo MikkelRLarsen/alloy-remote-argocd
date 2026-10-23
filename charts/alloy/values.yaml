@@ -1,0 +1,31 @@
+# The outer alloy key configures the Helm dependency.
+alloy:
+  # Exposes the Alloy UI on port 12345 for kubectl port-forward.
+  service:
+    enabled: true
+    type: ClusterIP
+
+  controller:
+    type: deployment
+    replicas: 1
+
+  # No monitoring CRDs are needed for this bootstrap.
+  crds:
+    create: false
+
+  alloy:
+    configMap:
+      content: |
+        import.git "server" {
+          repository     = "https://github.com/MikkelRLarsen/alloy-remote-configuration.git"
+          revision       = "main"
+          path           = "alloy-configuration/k8s.alloy"
+          pull_frequency = "5m"
+
+          basic_auth {
+            username = "MikkelRLarsen"
+            password = "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"
+          }
+        }
+
+        server.run "default" {}
