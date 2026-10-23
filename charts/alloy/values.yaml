@@ -14,6 +14,13 @@ alloy:
     create: false
 
   alloy:
+    extraEnv:
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: alloy-git
+            key: token
+
     configMap:
       content: |
         import.git "server" {
@@ -24,7 +31,7 @@ alloy:
 
           basic_auth {
             username = "MikkelRLarsen"
-            password = "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"
+            password = sys.env("GITHUB_TOKEN")
           }
         }
 
