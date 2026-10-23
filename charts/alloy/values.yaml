@@ -27,7 +27,7 @@ alloy:
           repository     = "https://github.com/MikkelRLarsen/alloy-remote-configuration.git"
           revision       = "main"
           path           = "alloy-configuration/k8s.alloy"
-          pull_frequency = "5m"
+          pull_frequency = "1m"
 
           basic_auth {
             username = "MikkelRLarsen"
