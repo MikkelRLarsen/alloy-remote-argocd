@@ -13,7 +13,7 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   generators:
     - git:
-        repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+        repoURL: https://github.com/MikkelRLarsen/alloy-remote-argocd.git
         revision: main
         directories:
           - path: apps/*
@@ -24,7 +24,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+        repoURL: https://github.com/MikkelRLarsen/alloy-remote-argocd.git
         targetRevision: main
         path: '{{.path.path}}'
       destination:
