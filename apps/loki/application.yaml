@@ -19,7 +19,7 @@ spec:
   # This repository uses the default project; no platform AppProject is defined.
   project: default
   source:
-    repoURL: https://github.com/MikkelRLarsen/infra-argocd-datamatiker.git
+    repoURL: https://github.com/MikkelRLarsen/alloy-remote-argocd.git
     targetRevision: main
     path: charts/loki
     helm:
