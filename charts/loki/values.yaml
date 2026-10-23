@@ -28,6 +28,7 @@ loki:
       delete_request_store: filesystem
 
     podAnnotations:
+      # Scrape the pod directly so discovery selects the Loki container once.
       prometheus.io/scrape: "true"
       prometheus.io/port: "3100"
       prometheus.io/path: "/metrics"
@@ -40,7 +41,10 @@ loki:
       size: 3Gi
 
   gateway:
-    enabled: false
+    enabled: true
+    basicAuth:
+      enabled: true
+      existingSecret: loki-basic-auth
 
   chunksCache:
     enabled: false

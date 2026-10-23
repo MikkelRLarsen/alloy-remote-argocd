@@ -12,6 +12,26 @@ alloy:
 
   alloy:
     extraEnv:
+      - name: LOKI_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: observability-basic-auth
+            key: username
+      - name: LOKI_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: observability-basic-auth
+            key: password
+      - name: PROMETHEUS_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: observability-basic-auth
+            key: username
+      - name: PROMETHEUS_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: observability-basic-auth
+            key: password
       - name: GITHUB_TOKEN
         valueFrom:
           secretKeyRef:
