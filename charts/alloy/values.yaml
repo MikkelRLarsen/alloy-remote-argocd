@@ -41,7 +41,7 @@ alloy:
     configMap:
       content: |
         import.git "server" {
-          repository     = "https://github.com/MikkelRLarsen/alloy-remote-configuration.git"
+          repository     = "https://github.com/MikkelRLarsen/alloy-remote-argocd.git"
           revision       = "main"
           path           = "alloy-configuration/k8s.alloy"
           pull_frequency = "1m"
