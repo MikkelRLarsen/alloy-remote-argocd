@@ -1,7 +1,7 @@
 // Import this module with import.git "server" and call server.run "default" {}.
 // Git import path: alloy-configuration/k8s.alloy (relative to repository root).
 // Prometheus must have its remote-write receiver enabled.
-// Add backend authentication to the endpoint blocks below if required.
+// Backend credentials are provided through LOKI_* and PROMETHEUS_* environment variables.
 //
 // Run in Kubernetes with a service account allowed to get/list/watch pods
 // across all namespaces and get pods/log. Use one Alloy replica for log
@@ -50,6 +50,11 @@ declare "run" {
 	loki.write "logs" {
 		endpoint {
 			url = "http://loki.loki:3100/loki/api/v1/push"
+
+			basic_auth {
+				username = sys.env("LOKI_USERNAME")
+				password = sys.env("LOKI_PASSWORD")
+			}
 		}
 	}
 
@@ -74,6 +79,11 @@ declare "run" {
 	prometheus.remote_write "metrics" {
 		endpoint {
 			url = "http://prometheus-server.prometheus/api/v1/write"
+
+			basic_auth {
+				username = sys.env("PROMETHEUS_USERNAME")
+				password = sys.env("PROMETHEUS_PASSWORD")
+			}
 		}
 	}
 }
