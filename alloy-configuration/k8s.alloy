@@ -1,0 +1,89 @@
+// Import this module with import.git "server" and call server.run "default" {}.
+// Git import path: alloy-configuration/k8s.alloy (relative to repository root).
+// Prometheus must have its remote-write receiver enabled.
+// Backend credentials are provided through LOKI_* and PROMETHEUS_* environment variables.
+//
+// Run in Kubernetes with a service account allowed to get/list/watch pods
+// across all namespaces and get pods/log. Use one Alloy replica for log
+// collection; multiple replicas with this config collect duplicate logs.
+// Kubernetes exposes retained container stdout/stderr logs, not arbitrary
+// application files or logs already removed by rotation/pod deletion.
+declare "run" {
+	discovery.kubernetes "pods" {
+		role = "pod"
+	}
+
+	discovery.relabel "pod_logs" {
+		targets = discovery.kubernetes.pods.targets
+
+		rule {
+			source_labels = ["__meta_kubernetes_namespace"]
+			target_label  = "namespace"
+		}
+
+		rule {
+			source_labels = ["__meta_kubernetes_pod_name"]
+			target_label  = "pod"
+		}
+
+		rule {
+			source_labels = ["__meta_kubernetes_pod_container_name"]
+			target_label  = "container"
+		}
+
+		rule {
+			source_labels = ["__meta_kubernetes_pod_node_name"]
+			target_label  = "node"
+		}
+
+		rule {
+			target_label = "cluster"
+			replacement  = "alloy"
+		}
+	}
+
+	loki.source.kubernetes "pod_logs" {
+		targets    = discovery.relabel.pod_logs.output
+		forward_to = [loki.write.logs.receiver]
+	}
+
+	loki.write "logs" {
+		endpoint {
+			url = "http://loki-gateway.loki/loki/api/v1/push"
+
+			basic_auth {
+				username = sys.env("LOKI_USERNAME")
+				password = sys.env("LOKI_PASSWORD")
+			}
+		}
+	}
+
+	prometheus.exporter.self "alloy" { }
+
+	prometheus.scrape "alloy" {
+		targets         = prometheus.exporter.self.alloy.targets
+		scrape_interval = "30s"
+		job_name        = "alloy"
+		forward_to      = [prometheus.relabel.cluster.receiver]
+	}
+
+	prometheus.relabel "cluster" {
+		forward_to = [prometheus.remote_write.metrics.receiver]
+
+		rule {
+			target_label = "cluster"
+			replacement  = "alloyv1"
+		}
+	}
+
+	prometheus.remote_write "metrics" {
+		endpoint {
+			url = "http://prometheus-server.prometheus/api/v1/write"
+
+			basic_auth {
+				username = sys.env("PROMETHEUS_USERNAME")
+				password = sys.env("PROMETHEUS_PASSWORD")
+			}
+		}
+	}
+}
