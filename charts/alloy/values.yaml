@@ -43,7 +43,7 @@ alloy:
         import.git "server" {
           repository     = "https://github.com/MikkelRLarsen/alloy-remote-argocd.git"
           revision       = "main"
-          path           = "alloy-configuration/k8s.alloy"
+          path           = "alloy-configuration"
           pull_frequency = "1m"
 
           basic_auth {

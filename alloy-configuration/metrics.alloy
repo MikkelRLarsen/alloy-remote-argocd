@@ -1,0 +1,46 @@
+declare "metrics" {
+
+  // Required arguments
+  argument "endpoint_url" {}
+  argument "username" {}
+  argument "password" {}
+  argument "cluster" {}
+
+  // Alloy self-monitoring
+  prometheus.exporter.self "alloy" {}
+
+  prometheus.scrape "alloy" {
+    targets = prometheus.exporter.self.alloy.targets
+
+    scrape_interval = "30s"
+    job_name        = "alloy"
+
+    forward_to = [
+      prometheus.relabel.cluster.receiver,
+    ]
+  }
+
+  // Add cluster label
+  prometheus.relabel "cluster" {
+    forward_to = [
+      prometheus.remote_write.metrics.receiver,
+    ]
+
+    rule {
+      target_label = "cluster"
+      replacement  = argument.cluster.value
+    }
+  }
+
+  // Forward metrics to Prometheus
+  prometheus.remote_write "metrics" {
+    endpoint {
+      url = argument.endpoint_url.value
+
+      basic_auth {
+        username = argument.username.value
+        password = argument.password.value
+      }
+    }
+  }
+}

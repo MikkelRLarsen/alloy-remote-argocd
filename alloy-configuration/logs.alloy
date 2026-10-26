@@ -1,0 +1,64 @@
+declare "logs" {
+
+  // Required arguments
+  argument "endpoint_url" {}
+  argument "username" {}
+  argument "password" {}
+  argument "cluster" {}
+
+  // Discover Kubernetes pods
+  discovery.kubernetes "pods" {
+    role = "pod"
+  }
+
+  // Attach Kubernetes metadata
+  discovery.relabel "pod_logs" {
+    targets = discovery.kubernetes.pods.targets
+
+    rule {
+      source_labels = ["__meta_kubernetes_namespace"]
+      target_label  = "namespace"
+    }
+
+    rule {
+      source_labels = ["__meta_kubernetes_pod_name"]
+      target_label  = "pod"
+    }
+
+    rule {
+      source_labels = ["__meta_kubernetes_pod_container_name"]
+      target_label  = "container"
+    }
+
+    rule {
+      source_labels = ["__meta_kubernetes_pod_node_name"]
+      target_label  = "node"
+    }
+
+    rule {
+      target_label = "cluster"
+      replacement  = argument.cluster.value
+    }
+  }
+
+  // Collect Kubernetes logs
+  loki.source.kubernetes "pod_logs" {
+    targets = discovery.relabel.pod_logs.output
+
+    forward_to = [
+      loki.write.logs.receiver,
+    ]
+  }
+
+  // Forward logs to Loki
+  loki.write "logs" {
+    endpoint {
+      url = argument.endpoint_url.value
+
+      basic_auth {
+        username = argument.username.value
+        password = argument.password.value
+      }
+    }
+  }
+}

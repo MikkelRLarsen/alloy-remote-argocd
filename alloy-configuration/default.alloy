@@ -1,0 +1,19 @@
+declare "run" {
+  logs "default" {
+    endpoint_url = "http://loki-gateway.loki/loki/api/v1/push"
+
+    username = sys.env("LOKI_USERNAME")
+    password = sys.env("LOKI_PASSWORD")
+
+    cluster = "alloy"
+  }
+
+  metrics "default" {
+    endpoint_url = "http://prometheus-server.prometheus/api/v1/write"
+
+    username = sys.env("PROMETHEUS_USERNAME")
+    password = sys.env("PROMETHEUS_PASSWORD")
+
+    cluster = "alloyv2"
+  }
+}
