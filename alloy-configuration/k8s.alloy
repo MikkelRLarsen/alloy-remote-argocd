@@ -49,7 +49,7 @@ declare "run" {
 
 	loki.write "logs" {
 		endpoint {
-			url = "http://loki.loki:3100/loki/api/v1/push"
+			url = "http://loki-gateway.loki/loki/api/v1/push"
 
 			basic_auth {
 				username = sys.env("LOKI_USERNAME")
