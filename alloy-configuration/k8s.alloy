@@ -72,7 +72,7 @@ declare "run" {
 
 		rule {
 			target_label = "cluster"
-			replacement  = "alloy"
+			replacement  = "alloyv1"
 		}
 	}
 
